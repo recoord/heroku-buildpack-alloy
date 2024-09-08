@@ -13,7 +13,7 @@ at() {
 }
 
 # fifo for communication between children
-wait_channel=$(mktemp -t buildpack-alloy-wait-) || exit 1
+wait_channel=$(mktemp -t buildpack-alloy-wait-XXXXX) || exit 1
 rm "$wait_channel" || exit 1
 mkfifo "$wait_channel" || exit 1
 
