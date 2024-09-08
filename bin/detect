@@ -1,0 +1,4 @@
+#!/usr/bin/env bash
+
+echo "alloy"
+exit 0

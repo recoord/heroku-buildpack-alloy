@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+#
+# start-alloy --config=<config> <command>
+#
+# This script acts as a process manager, of two children, waiting for either
+# alloy or the chained command to return before exiting.
+#
+# Delegates SIGTERM to the children, and SIGINT to the process group to force shutdown.
+# Sends SIG to the process group to dump stack traces.
+
+at() {
+    echo "start=alloy at=$*"
+}
+
+# Graceful shutdown to process group, forced with SIGINT. Can be called multiple
+# times from parent or child signals.
+shutdown() {
+    at "shutdown pgid=$$"
+    trap 'kill -INT -$$' SIGINT
+    trap '' SIGTERM # ignore SIGTERM to wait
+    kill -TERM -$$
+    wait
+}
+trap shutdown SIGTERM SIGINT
+
+# Defaults
+ALLOY_CONFIG="${ALLOY_CONFIG:-config.alloy}"
+
+# Parse arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --config=*)
+            ALLOY_CONFIG="${1#--config=}"
+            shift
+            ;;
+        --help)
+            echo "start-alloy --config=<path/config.alloy> <command>"
+            shift
+            exit 0
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+at "arguments config=$ALLOY_CONFIG"
+
+# Run when we have an alloy config
+if [[ -f "$ALLOY_CONFIG" ]]; then
+    at "run alloy"
+    mkdir -p /var/tmp/buildpack-alloy
+    vendor/alloy/bin/alloy run \
+        --storage.path="/var/tmp/buildpack-alloy" \
+        "$ALLOY_CONFIG" &
+else
+    at "skip alloy missing config=$ALLOY_CONFIG"
+fi
+
+at "run app cmd=\"$*\""
+"$@" &
+
+wait -n
+shutdown
+at "exit"

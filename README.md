@@ -18,3 +18,11 @@ In your Procfile, start alloy with a configuration then your application.
 ```console
 bin/start-alloy --confg=path/to/config.alloy YOUR_PROC_CMD
 ```
+
+## Upgrading the vendored Alloy version
+
+From a trusted computer and network:
+
+- Navigate to https://github.com/grafana/alloy/releases/latest
+- Replace the contents of VERSION with the release tag like `vX.Y.Z`.
+- Replace the contents of SHA256SUMS with the released [file](https://github.com/grafana/alloy/releases/download/latest/SHA256SUMS).
