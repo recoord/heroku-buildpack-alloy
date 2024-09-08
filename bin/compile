@@ -6,7 +6,6 @@ set -o pipefail
 
 BUILD_DIR=$1
 CACHE_DIR=$2
-ENV_DIR=$3
 
 BUILDPACK_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 VERSION=$(cat "$BUILDPACK_ROOT_DIR/VERSION")
@@ -25,9 +24,9 @@ info() {
 sha_check() {
     echo "$SHA256SUMS" | grep "$ARCHIVE" | {
         if command -v sha256sum >/dev/null; then
-            sha256sum -c "$@" -
+            sha256sum -c -
         elif command -v shasum >/dev/null; then
-            shasum -a 256 -c "$@" -
+            shasum -a 256 -c -
         else
             log "unable to find shasum to check sums"
             exit 1
@@ -69,7 +68,7 @@ case "$STACK" in
 esac
 
 mkdir -p "$CACHE_DIR"
-cd "$CACHE_DIR"
+cd "$CACHE_DIR" || exit 1
 
 log "checking cache"
 if ! sha_check | info; then
