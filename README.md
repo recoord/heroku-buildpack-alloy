@@ -42,3 +42,10 @@ Test a compilation works with:
 ```console
 bin/compile <your-app-dir> /tmp/cache /tmp
 ```
+
+This repo can be used as an app to test the `example.alloy` config after setup
+to push to the Heroku git URL.
+
+```config
+git push heroku main
+```
