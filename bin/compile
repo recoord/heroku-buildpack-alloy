@@ -10,8 +10,10 @@ CACHE_DIR=$2
 BUILDPACK_ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 VERSION=$(cat "$BUILDPACK_ROOT_DIR/VERSION")
 SHA256SUMS=$(cat "$BUILDPACK_ROOT_DIR/SHA256SUMS")
+
+STACK=${STACK:-local}
 ARCH=$(uname -m)
-STACK=${STACK:-heroku-24}
+OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 
 log() {
     echo "-----> $*"
@@ -54,12 +56,16 @@ case "$ARCH" in
     ;;
 esac
 
+# Detect stack if running in heroku
 case "$STACK" in
   heroku-20|heroku-22)
     ARCHIVE="alloy-linux-amd64.zip"
     ;;
   heroku-24)
     ARCHIVE="alloy-linux-$ARCH.zip"
+    ;;
+  local)
+    ARCHIVE="alloy-$OS-$ARCH.zip"
     ;;
   *)
     log "unsupported stack $STACK"
@@ -71,7 +77,7 @@ mkdir -p "$CACHE_DIR"
 cd "$CACHE_DIR" || exit 1
 
 log "checking cache"
-if ! sha_check | info; then
+if ! sha_check 2>&1|info; then
     log "cache miss"
     rm -f "$ARCHIVE"
 else
@@ -92,7 +98,7 @@ unzip -o "$ARCHIVE" 2>&1|info
 
 log "installing binary alloy"
 mkdir -p "$BUILD_DIR/vendor/alloy/bin"
-install -m 0755 ${ARCHIVE%%.zip} "$BUILD_DIR/vendor/alloy/bin/alloy" 2>&1|info
+install -m 0755 "${ARCHIVE%%.zip}" "$BUILD_DIR/vendor/alloy/bin/alloy" 2>&1|info
 
 log "installing script start-alloy"
 mkdir -p "$BUILD_DIR/bin"

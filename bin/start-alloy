@@ -5,23 +5,29 @@
 # This script acts as a process manager, of two children, waiting for either
 # alloy or the chained command to return before exiting.
 #
-# Delegates SIGTERM to the children, and SIGINT to the process group to force shutdown.
-# Sends SIG to the process group to dump stack traces.
+#
+# Delegates SIGTERM to the children on signal or child exit
 
 at() {
-    echo "start=alloy at=$*"
+    echo "buildpack=alloy at=$*"
 }
+
+# fifo for communication between children
+wait_channel=$(mktemp -t buildpack-alloy-wait-) || exit 1
+rm "$wait_channel" || exit 1
+mkfifo "$wait_channel" || exit 1
 
 # Graceful shutdown to process group, forced with SIGINT. Can be called multiple
 # times from parent or child signals.
 shutdown() {
     at "shutdown pgid=$$"
-    trap 'kill -INT -$$' SIGINT
-    trap '' SIGTERM # ignore SIGTERM to wait
-    kill -TERM -$$
+    rm -f "$wait_channel" # Remove blocking writes
+    trap '' SIGTERM EXIT  # Remove recursive signals
+    kill -TERM -$$        # Graceful TERM for process group
     wait
+    rm -f "$wait_channel" # Cleanup unblocked writes
 }
-trap shutdown SIGTERM SIGINT
+trap shutdown SIGTERM EXIT
 
 # Defaults
 ALLOY_CONFIG="${ALLOY_CONFIG:-config.alloy}"
@@ -43,23 +49,29 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+at "args config=$ALLOY_CONFIG"
 
-at "arguments config=$ALLOY_CONFIG"
-
-# Run when we have an alloy config
+# Only run when we have an alloy config
 if [[ -f "$ALLOY_CONFIG" ]]; then
-    at "run alloy"
-    mkdir -p /var/tmp/buildpack-alloy
-    vendor/alloy/bin/alloy run \
-        --storage.path="/var/tmp/buildpack-alloy" \
-        "$ALLOY_CONFIG" &
+    (
+        at "run alloy"
+        mkdir -p /var/tmp/buildpack-alloy
+        vendor/alloy/bin/alloy run \
+            --storage.path="/var/tmp/buildpack-alloy" \
+            "$ALLOY_CONFIG"
+        echo "process=alloy code=$?" >"$wait_channel"
+    ) &
 else
     at "skip alloy missing config=$ALLOY_CONFIG"
 fi
 
-at "run app cmd=\"$*\""
-"$@" &
+(
+    at "run app cmd=\"$*\""
+    "$@"
+    echo "process=app code=$?" >"$wait_channel"
+) &
 
-wait -n
+# Wait for either child subshell exit
+read -r exit_status <"$wait_channel"
 shutdown
-at "exit"
+at "exit $exit_status"
