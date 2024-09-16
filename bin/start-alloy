@@ -21,7 +21,7 @@ mkfifo "$wait_channel" || exit 1
 # times from parent or child signals.
 shutdown() {
     at "shutdown pgid=$$"
-    rm -f "$wait_channel" # Remove blocking writes
+    rm -f "$wait_channel" # Remove blocking writes for subshells to shutdown
     trap '' SIGTERM EXIT  # Remove recursive signals
     kill -TERM -$$        # Graceful TERM for process group
     wait
@@ -55,6 +55,7 @@ at "args config=$ALLOY_CONFIG"
 if [[ -f "$ALLOY_CONFIG" ]]; then
     (
         at "run alloy"
+        trap "" SIGTERM # Ignore in subshell so we shutdown via fifo
         mkdir -p /var/tmp/buildpack-alloy
         vendor/alloy/bin/alloy run \
             --storage.path="/var/tmp/buildpack-alloy" \
@@ -67,6 +68,7 @@ fi
 
 (
     at "run app cmd=\"$*\""
+    trap "" SIGTERM # Ignore in subshell so we shutdown via fifo
     "$@"
     echo "process=app code=$?" >"$wait_channel"
 ) &
